@@ -2,6 +2,9 @@
 Description=Bird ID - Arlo bird-species monitor
 After=network-online.target
 Wants=network-online.target
+# Don't get stuck in a tight crash loop (these keys belong in [Unit]).
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -11,9 +14,6 @@ ExecStart=/opt/bird-id/.venv/bin/python /opt/bird-id/main.py
 # Restart on crash and after clean exit (Arlo session drops, transient network).
 Restart=always
 RestartSec=15
-# Don't get stuck in a tight crash loop.
-StartLimitIntervalSec=300
-StartLimitBurst=5
 
 [Install]
 WantedBy=multi-user.target
