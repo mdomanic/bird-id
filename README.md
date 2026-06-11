@@ -31,7 +31,41 @@ Set `BIRD_ID_ENGINE` in `.env` (or from the Settings page):
 | Engine | Cost | Output | Notes |
 |--------|------|--------|-------|
 | **`local`** (default) | **Free** | species + confidence | On-device TFLite classifier (iNaturalist MobileNet, ~960 species). Runs on CPU in milliseconds, fully offline. Download the model once with `scripts/get_model.sh` (the installer does this). |
-| `claude` | API credits | species + reasoning + field marks | Claude vision API. More accurate on tricky shots, open-ended species, and gracefully says "that's a squirrel". Needs `ANTHROPIC_API_KEY`. |
+| `ollama` | **Free** (self-hosted) | species + reasoning + field marks | A vision-LLM running on your own Ollama server (`OLLAMA_URL` / `OLLAMA_MODEL`). Claude-like reasoning at no per-image cost, but you run the model. See "Running a local vision-LLM" below. |
+| `claude` | API credits | species + reasoning + field marks | Claude vision API. Most accurate on tricky shots, open-ended species, gracefully says "that's a squirrel". Needs `ANTHROPIC_API_KEY`. |
+
+### Running a local vision-LLM (the `ollama` engine)
+
+For Claude-style reasoning with no API cost, run a vision model on a beefy box
+(GPU ideal; a many-core CPU server with lots of RAM also works) and point the app
+at it.
+
+1. **Create a Proxmox guest for Ollama.** An LXC (Debian/Ubuntu) is lightest and
+   best for CPU inference; a VM is fine if you prefer isolation. Give it a large
+   slice of cores and RAM. On a dual-socket NUMA box, pin it to **one socket's
+   cores** for best memory bandwidth.
+2. **Install Ollama and pull a vision model:**
+   ```bash
+   curl -fsSL https://ollama.com/install.sh | sh
+   ollama pull llama3.2-vision        # or qwen2.5vl:7b, or moondream (small/fast)
+   # expose it on the LAN so the bird-id container can reach it:
+   #   set Environment=OLLAMA_HOST=0.0.0.0 in the ollama systemd unit, then restart
+   ```
+3. **Point the app at it** (Settings page or `.env`):
+   ```ini
+   BIRD_ID_ENGINE=ollama
+   OLLAMA_URL=http://<ollama-host-ip>:11434
+   OLLAMA_MODEL=llama3.2-vision
+   ```
+   Restart the monitor. No API key needed.
+
+**Model sizing (CPU, no GPU):** start at **7–11B** (`qwen2.5vl:7b`,
+`llama3.2-vision`) — they ID an image in seconds to tens of seconds. Larger
+32B/72B models are more capable but each image can take minutes on CPU, which can
+fall behind a busy camera (the watcher processes one event at a time). Raise
+`OLLAMA_TIMEOUT` if you go big. A general VLM reasons well but may still trail the
+`local` classifier on *exact* species — running `local` for naming and `ollama`
+for verification is a reasonable combo.
 
 Both feed the exact same pipeline (frames → ID → log/notify/dashboard), so you can
 switch engines anytime — change `BIRD_ID_ENGINE`, restart the monitor, done.

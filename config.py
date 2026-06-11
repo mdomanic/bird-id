@@ -35,6 +35,11 @@ class Settings:
     bird_model_path: str = os.getenv("BIRD_MODEL_PATH", str(BASE_DIR / "models" / "birds.tflite"))
     bird_labels_path: str = os.getenv("BIRD_LABELS_PATH", str(BASE_DIR / "models" / "birds_labels.txt"))
 
+    # Ollama engine (only used when BIRD_ID_ENGINE=ollama) — local vision-LLM.
+    ollama_url: str = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3.2-vision")
+    ollama_timeout: int = int(os.getenv("OLLAMA_TIMEOUT", "180") or "180")
+
     # Claude engine (only used when BIRD_ID_ENGINE=claude)
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     bird_id_model: str = os.getenv("BIRD_ID_MODEL", "claude-opus-4-8")

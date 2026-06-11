@@ -45,10 +45,12 @@ def identify_birds(frames: list[bytes]) -> BirdAnalysis:
     engine = (settings.bird_id_engine or "local").lower()
     if engine == "claude":
         from engine_claude import analyze
+    elif engine == "ollama":
+        from engine_ollama import analyze
     elif engine in ("local", "tflite"):
         from engine_local import analyze
     else:
         raise RuntimeError(
-            f"Unknown BIRD_ID_ENGINE '{engine}'. Use 'local' or 'claude'."
+            f"Unknown BIRD_ID_ENGINE '{engine}'. Use 'local', 'ollama', or 'claude'."
         )
     return analyze(frames)

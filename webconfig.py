@@ -27,8 +27,18 @@ class Field:
 SECTIONS: list[tuple[str, list[Field]]] = [
     ("Engine", [
         Field("BIRD_ID_ENGINE", "ID engine", "select",
-              "'local' = free on-device classifier; 'claude' = API (needs credits).",
-              options=["local", "claude"]),
+              "local = free on-device classifier; ollama = local vision-LLM; "
+              "claude = API (needs credits).",
+              options=["local", "ollama", "claude"]),
+    ]),
+    ("Ollama (only used when engine = ollama)", [
+        Field("OLLAMA_URL", "Ollama URL", "text",
+              "e.g. http://192.168.1.60:11434 — the box running Ollama."),
+        Field("OLLAMA_MODEL", "Vision model", "text",
+              "e.g. llama3.2-vision, qwen2.5vl:7b, moondream."),
+        Field("OLLAMA_TIMEOUT", "Timeout (seconds)", "int",
+              "Max wait per image. CPU inference can be slow.",
+              minimum=10, maximum=1200),
     ]),
     ("Claude (only used when engine = claude)", [
         Field("ANTHROPIC_API_KEY", "Anthropic API key", "password",
