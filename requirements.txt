@@ -1,0 +1,16 @@
+# Core
+anthropic>=0.40           # Claude API (bird identification via vision)
+python-dotenv>=1.0        # load configuration from .env
+
+# Arlo camera access (unofficial cloud API)
+pyaarlo>=0.8
+
+# Frame extraction from recorded clips + image handling
+opencv-python-headless>=4.9
+pillow>=10.0
+
+# Web dashboard
+flask>=3.0
+
+# Desktop notifications (Windows toast). Optional; ignored on other platforms.
+winotify>=1.1 ; sys_platform == "win32"

@@ -1,0 +1,15 @@
+[Unit]
+Description=Bird ID - web dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=birdid
+WorkingDirectory=/opt/bird-id
+ExecStart=/opt/bird-id/.venv/bin/python /opt/bird-id/dashboard.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

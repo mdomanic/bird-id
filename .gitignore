@@ -1,0 +1,11 @@
+# Secrets & local config
+.env
+
+# Runtime data
+data/
+captures/
+
+# Python
+.venv/
+__pycache__/
+*.pyc

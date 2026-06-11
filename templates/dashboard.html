@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bird ID — Sightings</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      margin: 0; background: #0f1115; color: #e7e9ee;
+    }
+    header {
+      padding: 20px 28px; background: #161a22; border-bottom: 1px solid #232a36;
+    }
+    header h1 { margin: 0; font-size: 20px; }
+    header p { margin: 4px 0 0; color: #9aa3b2; font-size: 13px; }
+    main { padding: 24px 28px; max-width: 1100px; margin: 0 auto; }
+    h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em;
+         color: #9aa3b2; margin: 28px 0 12px; }
+    .tally { display: flex; flex-wrap: wrap; gap: 10px; }
+    .chip {
+      background: #1b2230; border: 1px solid #2a3344; border-radius: 999px;
+      padding: 8px 14px; font-size: 14px;
+    }
+    .chip b { color: #7fd1ae; }
+    .chip small { color: #8b94a6; }
+    .grid {
+      display: grid; gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    }
+    .card {
+      background: #161a22; border: 1px solid #232a36; border-radius: 12px;
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; background:#0a0c10; }
+    .card .body { padding: 12px 14px; }
+    .card .name { font-weight: 600; font-size: 16px; }
+    .card .sci { font-style: italic; color: #9aa3b2; font-size: 13px; }
+    .card .meta { margin-top: 8px; font-size: 13px; color: #aeb6c4; }
+    .conf {
+      display: inline-block; padding: 2px 8px; border-radius: 6px;
+      background: #1f3a2e; color: #7fd1ae; font-size: 12px; font-weight: 600;
+    }
+    .conf.low { background: #3a2f1f; color: #d9b873; }
+    .marks { margin-top: 8px; font-size: 12px; color: #8b94a6; }
+    .empty { color: #8b94a6; padding: 40px 0; text-align: center; }
+    footer { text-align:center; color:#6b7488; font-size:12px; padding: 24px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🐦 Bird ID — Sightings</h1>
+    <p>
+      {{ sightings|length }} recent sighting(s),
+      {{ tally|length }} distinct species{% if location %} · {{ location }}{% endif %}
+    </p>
+  </header>
+  <main>
+    <h2>Species seen</h2>
+    {% if tally %}
+    <div class="tally">
+      {% for s in tally %}
+      <span class="chip">
+        <b>{{ s.common_name }}</b>
+        × {{ s.sightings }}
+        <small>· best {{ '%.0f'|format(s.best_confidence * 100) }}%</small>
+      </span>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">No species logged yet. Start the monitor with
+      <code>python main.py</code>, or test with
+      <code>python identify_file.py some_bird.jpg</code>.</p>
+    {% endif %}
+
+    <h2>Recent sightings</h2>
+    {% if sightings %}
+    <div class="grid">
+      {% for s in sightings %}
+      <div class="card">
+        {% if s.image_name %}
+          <img src="/image/{{ s.image_name }}" alt="{{ s.common_name }}" loading="lazy">
+        {% endif %}
+        <div class="body">
+          <div class="name">{{ s.common_name }}{% if s.count and s.count > 1 %}
+            <span class="sci">× {{ s.count }}</span>{% endif %}</div>
+          {% if s.scientific_name %}<div class="sci">{{ s.scientific_name }}</div>{% endif %}
+          <div class="meta">
+            <span class="conf {{ 'low' if s.confidence < 0.6 else '' }}">
+              {{ '%.0f'|format(s.confidence * 100) }}%
+            </span>
+            &nbsp;{{ s.timestamp.replace('T', ' ') }}
+            &nbsp;· {{ s.source }}
+          </div>
+          {% if s.field_marks %}<div class="marks">{{ s.field_marks }}</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">No sightings recorded yet.</p>
+    {% endif %}
+  </main>
+  <footer>Bird ID · powered by Claude vision</footer>
+</body>
+</html>
