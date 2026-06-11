@@ -24,6 +24,23 @@ motion ─▶ Arlo clip ─▶ sample frames ─▶ Claude vision ─▶ log + i
 | `main.py` | Live monitor entry point |
 | `identify_file.py` | Offline test: run the pipeline on a local image/video |
 
+## Identification engines
+
+Set `BIRD_ID_ENGINE` in `.env` (or from the Settings page):
+
+| Engine | Cost | Output | Notes |
+|--------|------|--------|-------|
+| **`local`** (default) | **Free** | species + confidence | On-device TFLite classifier (iNaturalist MobileNet, ~960 species). Runs on CPU in milliseconds, fully offline. Download the model once with `scripts/get_model.sh` (the installer does this). |
+| `claude` | API credits | species + reasoning + field marks | Claude vision API. More accurate on tricky shots, open-ended species, and gracefully says "that's a squirrel". Needs `ANTHROPIC_API_KEY`. |
+
+Both feed the exact same pipeline (frames → ID → log/notify/dashboard), so you can
+switch engines anytime — change `BIRD_ID_ENGINE`, restart the monitor, done.
+
+The local model has no per-image cost but a fixed species list and species-only
+output; Claude costs per image but reasons about the scene. Many people run
+`local` as the always-on default and only flip to `claude` when they want a
+second opinion on something unusual.
+
 ## Setup
 
 ### 1. Python

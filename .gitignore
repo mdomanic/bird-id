@@ -5,6 +5,9 @@
 data/
 captures/
 
+# Downloaded model files (fetch with scripts/get_model.sh)
+models/
+
 # Python
 .venv/
 __pycache__/

@@ -28,7 +28,14 @@ def _split_csv(value: str) -> list[str]:
 
 @dataclass(frozen=True)
 class Settings:
-    # Claude
+    # Identification engine: "local" (free on-device classifier) or "claude" (API).
+    bird_id_engine: str = os.getenv("BIRD_ID_ENGINE", "local")
+
+    # Local engine (TFLite classifier) model + labels.
+    bird_model_path: str = os.getenv("BIRD_MODEL_PATH", str(BASE_DIR / "models" / "birds.tflite"))
+    bird_labels_path: str = os.getenv("BIRD_LABELS_PATH", str(BASE_DIR / "models" / "birds_labels.txt"))
+
+    # Claude engine (only used when BIRD_ID_ENGINE=claude)
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     bird_id_model: str = os.getenv("BIRD_ID_MODEL", "claude-opus-4-8")
     location_hint: str = os.getenv("LOCATION_HINT", "")

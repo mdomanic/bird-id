@@ -25,9 +25,14 @@ class Field:
 
 # Ordered list of (section title, [fields]).
 SECTIONS: list[tuple[str, list[Field]]] = [
-    ("Claude", [
+    ("Engine", [
+        Field("BIRD_ID_ENGINE", "ID engine", "select",
+              "'local' = free on-device classifier; 'claude' = API (needs credits).",
+              options=["local", "claude"]),
+    ]),
+    ("Claude (only used when engine = claude)", [
         Field("ANTHROPIC_API_KEY", "Anthropic API key", "password",
-              "From console.anthropic.com. Used to identify birds."),
+              "From console.anthropic.com. Only needed for the claude engine."),
         Field("BIRD_ID_MODEL", "Model", "select",
               "Opus is most accurate; Sonnet/Haiku are cheaper.", options=MODELS),
         Field("LOCATION_HINT", "Location hint", "text",

@@ -1,6 +1,14 @@
 # Core
-anthropic>=0.40           # Claude API (bird identification via vision)
 python-dotenv>=1.0        # load configuration from .env
+numpy>=1.24               # array handling for the local classifier
+
+# Local bird-ID engine (BIRD_ID_ENGINE=local, the free default).
+# tflite-runtime is Linux/macOS only; on Windows use BIRD_ID_ENGINE=claude
+# or `pip install tensorflow` instead.
+tflite-runtime>=2.14 ; sys_platform == "linux"
+
+# Claude bird-ID engine (BIRD_ID_ENGINE=claude). Optional unless you use it.
+anthropic>=0.40           # Claude vision API
 
 # Arlo camera access (unofficial cloud API)
 pyaarlo>=0.8

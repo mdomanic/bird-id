@@ -18,8 +18,9 @@ fi
 
 echo "==> Installing system packages"
 apt-get update
-# python venv/pip + a couple of runtime libs OpenCV needs even in headless form.
-apt-get install -y python3 python3-venv python3-pip libglib2.0-0
+# python venv/pip + a couple of runtime libs OpenCV needs even in headless form,
+# plus curl to download the local model.
+apt-get install -y python3 python3-venv python3-pip libglib2.0-0 curl
 
 echo "==> Creating service user '$APP_USER'"
 if ! id -u "$APP_USER" >/dev/null 2>&1; then
@@ -33,6 +34,9 @@ python3 -m venv "$APP_DIR/.venv"
 
 echo "==> Preparing data directories"
 mkdir -p "$APP_DIR/data" "$APP_DIR/captures"
+
+echo "==> Downloading the free local bird model"
+bash "$APP_DIR/scripts/get_model.sh"
 
 if [[ ! -f "$APP_DIR/.env" ]]; then
   cp "$APP_DIR/.env.example" "$APP_DIR/.env"
