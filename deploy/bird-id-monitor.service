@@ -10,6 +10,8 @@ StartLimitBurst=5
 Type=simple
 User=birdid
 WorkingDirectory=/opt/bird-id
+# Unbuffered so the app's print() output reaches journald in real time.
+Environment=PYTHONUNBUFFERED=1
 ExecStart=/opt/bird-id/.venv/bin/python /opt/bird-id/main.py
 # Restart on crash and after clean exit (Arlo session drops, transient network).
 Restart=always
