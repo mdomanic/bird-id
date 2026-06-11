@@ -47,6 +47,9 @@ cp "$APP_DIR/deploy/bird-id-monitor.service"   /etc/systemd/system/
 cp "$APP_DIR/deploy/bird-id-dashboard.service" /etc/systemd/system/
 systemctl daemon-reload
 
+echo "==> Installing sudoers rule (lets the dashboard restart the monitor)"
+install -m 0440 -o root -g root "$APP_DIR/deploy/birdid-sudoers" /etc/sudoers.d/birdid
+
 cat <<'EOF'
 
 ==> Done.

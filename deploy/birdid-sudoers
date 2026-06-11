@@ -1,0 +1,7 @@
+# Lets the dashboard (running as user 'birdid') restart ONLY the monitor service
+# when you click "Restart monitor now" on the settings page. It cannot run any
+# other command as root.
+#
+# Install with:  install -m 0440 -o root -g root deploy/birdid-sudoers /etc/sudoers.d/birdid
+# (setup.sh does this for you on a fresh install.)
+birdid ALL=(root) NOPASSWD: /usr/bin/systemctl restart bird-id-monitor

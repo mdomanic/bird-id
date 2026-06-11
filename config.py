@@ -59,6 +59,9 @@ class Settings:
     # Dashboard
     dashboard_host: str = os.getenv("DASHBOARD_HOST", "127.0.0.1")
     dashboard_port: int = int(os.getenv("DASHBOARD_PORT", "5000") or "5000")
+    # Password protecting the web settings page (Basic Auth). Blank = unprotected
+    # "bootstrap" mode that warns you to set one.
+    dashboard_password: str = os.getenv("DASHBOARD_PASSWORD", "")
 
     def ensure_dirs(self) -> None:
         for d in (DATA_DIR, CAPTURES_DIR, CLIPS_DIR):

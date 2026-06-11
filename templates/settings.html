@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bird ID — Settings</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; background: #0f1115; color: #e7e9ee; }
+    header { padding: 20px 28px; background: #161a22; border-bottom: 1px solid #232a36;
+             display: flex; justify-content: space-between; align-items: center; }
+    header h1 { margin: 0; font-size: 20px; }
+    header a { color: #7fd1ae; text-decoration: none; font-size: 14px; }
+    main { padding: 24px 28px; max-width: 720px; margin: 0 auto; }
+    .flash { padding: 12px 16px; border-radius: 8px; margin: 0 0 14px; font-size: 14px; }
+    .flash.ok { background: #18331f; color: #8fe0a8; border: 1px solid #285a37; }
+    .flash.error { background: #3a1f22; color: #e0a0a8; border: 1px solid #5a2832; }
+    .warn { background: #3a2f1f; color: #e6c879; border: 1px solid #5a4a28;
+            padding: 12px 16px; border-radius: 8px; margin: 0 0 18px; font-size: 14px; }
+    fieldset { border: 1px solid #232a36; border-radius: 10px; margin: 0 0 20px; padding: 8px 18px 18px; }
+    legend { padding: 0 8px; color: #9aa3b2; font-size: 13px; text-transform: uppercase;
+             letter-spacing: .06em; }
+    .row { margin: 14px 0; }
+    label { display: block; font-size: 14px; margin-bottom: 5px; }
+    .badge { color: #7fd1ae; font-size: 12px; margin-left: 6px; }
+    input, select { width: 100%; padding: 9px 11px; border-radius: 7px;
+                    border: 1px solid #2a3344; background: #0e1219; color: #e7e9ee; font-size: 14px; }
+    .help { color: #8b94a6; font-size: 12px; margin-top: 5px; }
+    .actions { display: flex; gap: 12px; align-items: center; margin-top: 8px; }
+    button { padding: 10px 18px; border-radius: 8px; border: 0; font-size: 14px;
+             font-weight: 600; cursor: pointer; }
+    button.primary { background: #2f7d57; color: #eafff3; }
+    button.secondary { background: #232a36; color: #cdd4e0; }
+    form.inline { display: inline; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>⚙️ Settings</h1>
+    <a href="/">← back to sightings</a>
+  </header>
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    {% if insecure %}
+    <div class="warn">
+      ⚠️ No settings password is set — anyone on your network can change these
+      settings. Set a <b>Settings password</b> below and save to lock this page.
+    </div>
+    {% endif %}
+
+    <form method="post" action="/settings">
+      {% for title, fields in sections %}
+      <fieldset>
+        <legend>{{ title }}</legend>
+        {% for f in fields %}
+        <div class="row">
+          <label for="{{ f.key }}">
+            {{ f.label }}
+            {% if f.type == 'password' and current.get(f.key) %}
+              <span class="badge">● set</span>
+            {% endif %}
+          </label>
+          {% if f.type == 'select' %}
+            <select id="{{ f.key }}" name="{{ f.key }}">
+              {% for opt in f.options %}
+              <option value="{{ opt }}" {{ 'selected' if current.get(f.key) == opt else '' }}>{{ opt }}</option>
+              {% endfor %}
+            </select>
+          {% elif f.type == 'password' %}
+            <input type="password" id="{{ f.key }}" name="{{ f.key }}"
+                   placeholder="•••••••• (leave blank to keep current)" autocomplete="new-password">
+          {% else %}
+            <input type="{{ 'number' if f.type in ('int','float') else 'text' }}"
+                   id="{{ f.key }}" name="{{ f.key }}"
+                   value="{{ current.get(f.key, '') }}"
+                   {% if f.type == 'float' %}step="0.05"{% endif %}
+                   {% if f.minimum is not none %}min="{{ f.minimum }}"{% endif %}
+                   {% if f.maximum is not none %}max="{{ f.maximum }}"{% endif %}>
+          {% endif %}
+          {% if f.help %}<div class="help">{{ f.help }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      </fieldset>
+      {% endfor %}
+
+      <div class="actions">
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+
+    <hr style="border-color:#232a36; margin:24px 0;">
+    <p class="help">After saving, the camera watcher needs a restart to pick up
+      changes.</p>
+    <form class="inline" method="post" action="/settings/restart">
+      <button type="submit" class="secondary">Restart monitor now</button>
+    </form>
+  </main>
+</body>
+</html>

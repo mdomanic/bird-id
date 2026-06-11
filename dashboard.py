@@ -1,25 +1,64 @@
-"""Local web dashboard for browsing bird sightings.
+"""Local web dashboard for browsing bird sightings and editing configuration.
 
     python dashboard.py
 
 Then open http://127.0.0.1:5000/ (host/port configurable in .env).
+
+The /settings page edits .env and is protected by Basic Auth using
+DASHBOARD_PASSWORD. The read-only sightings views are open on your LAN.
 """
 from __future__ import annotations
 
+import hmac
+import subprocess
+from functools import wraps
 from pathlib import Path
 
-from flask import Flask, abort, jsonify, render_template, send_file
+from flask import (
+    Flask, Response, abort, flash, jsonify, redirect, render_template,
+    request, send_file, url_for,
+)
 
 from config import CAPTURES_DIR, settings
+from envfile import read_env, update_env
 from storage import recent_sightings, species_tally
+from webconfig import SECTIONS, collect_updates
 
 app = Flask(__name__)
+# Needed only for flashed messages on the settings page.
+app.secret_key = "bird-id-dashboard"  # not security-sensitive (no user sessions)
 
+
+# --- Auth --------------------------------------------------------------------
+
+def _current_password() -> str:
+    """Read the dashboard password fresh from .env each request so changes apply
+    immediately without restarting the dashboard."""
+    return read_env().get("DASHBOARD_PASSWORD", "") or settings.dashboard_password
+
+
+def require_auth(view):
+    """Protect a view with Basic Auth. If no password is configured, allow access
+    (bootstrap mode) so you can set one — the settings page warns about this."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        password = _current_password()
+        if password:
+            auth = request.authorization
+            if not auth or not hmac.compare_digest(auth.password or "", password):
+                return Response(
+                    "Authentication required.", 401,
+                    {"WWW-Authenticate": 'Basic realm="Bird ID settings"'},
+                )
+        return view(*args, **kwargs)
+    return wrapped
+
+
+# --- Sightings (open) --------------------------------------------------------
 
 @app.route("/")
 def index():
     sightings = recent_sightings(limit=100)
-    # Expose just the filename so the template can build /image/<name> URLs.
     for s in sightings:
         s["image_name"] = Path(s["image_path"]).name if s.get("image_path") else None
     return render_template(
@@ -42,11 +81,59 @@ def api_species():
 
 @app.route("/image/<path:name>")
 def image(name: str):
-    # Serve only files that live inside the captures directory.
     target = (CAPTURES_DIR / Path(name).name).resolve()
     if not str(target).startswith(str(CAPTURES_DIR.resolve())) or not target.exists():
         abort(404)
     return send_file(target, mimetype="image/jpeg")
+
+
+# --- Settings (auth-protected) -----------------------------------------------
+
+@app.route("/settings", methods=["GET", "POST"])
+@require_auth
+def settings_page():
+    if request.method == "POST":
+        changes, errors = collect_updates(request.form)
+        if errors:
+            for err in errors:
+                flash(err, "error")
+        else:
+            update_env(changes)
+            flash("Saved. Restart the monitor to apply changes to the camera "
+                  "watcher.", "ok")
+            return redirect(url_for("settings_page"))
+
+    current = read_env()
+    return render_template(
+        "settings.html",
+        sections=SECTIONS,
+        current=current,
+        insecure=not _current_password(),
+    )
+
+
+@app.route("/settings/restart", methods=["POST"])
+@require_auth
+def restart_monitor():
+    """Restart the monitor service so saved settings take effect.
+
+    Requires a sudoers rule allowing the dashboard user to run exactly this
+    command (see deploy/birdid-sudoers). Falls back to a clear message if not."""
+    try:
+        result = subprocess.run(
+            ["sudo", "-n", "/usr/bin/systemctl", "restart", "bird-id-monitor"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0:
+            flash("Monitor restarted.", "ok")
+        else:
+            detail = (result.stderr or result.stdout).strip()
+            flash(f"Couldn't restart automatically ({detail or 'permission denied'}). "
+                  "Run 'systemctl restart bird-id-monitor' on the server.", "error")
+    except Exception as exc:
+        flash(f"Restart failed: {exc}. Run 'systemctl restart bird-id-monitor' "
+              "on the server.", "error")
+    return redirect(url_for("settings_page"))
 
 
 def main() -> int:

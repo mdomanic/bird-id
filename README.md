@@ -145,6 +145,30 @@ systemctl restart bird-id-monitor    # after editing .env
 systemctl status bird-id-dashboard
 ```
 
+## Configuring from the web (Settings page)
+
+Instead of editing `.env` over SSH, you can change everything from the dashboard:
+click **⚙️ Settings** (top-right) or go to `http://<server-ip>:5000/settings`.
+
+- **It's password-protected.** Set `DASHBOARD_PASSWORD` in `.env` (or set it from
+  the Settings page on first use). Log in with any username and that password.
+  Until one is set, the page warns that it's unprotected. The read-only sightings
+  view stays open on your LAN.
+- **Secrets are write-only.** API key / passwords show as blank with a "● set"
+  badge if a value exists; leave them blank to keep the current value, or type a
+  new one to replace it. Saving never wipes a secret you left blank.
+- **Applying changes.** The monitor runs as a separate service, so after saving,
+  click **Restart monitor now** (or run `systemctl restart bird-id-monitor`).
+  The button uses a locked-down sudoers rule (`deploy/birdid-sudoers`) that lets
+  the dashboard restart *only* that one service. `setup.sh` installs it; if you
+  set this up before this feature existed, install it once with:
+  ```bash
+  install -m 0440 -o root -g root /opt/bird-id/deploy/birdid-sudoers /etc/sudoers.d/birdid
+  ```
+
+`DASHBOARD_HOST` / `DASHBOARD_PORT` are deliberately not web-editable (changing
+the bind address could lock you out) — edit those in `.env` if needed.
+
 ## Tuning (in `.env`)
 
 - `BIRD_ID_MODEL` — `claude-opus-4-8` (default, most accurate). Switch to
