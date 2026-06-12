@@ -26,10 +26,13 @@ def _on_clip(clip_path: Path, source: str) -> None:
 
 
 def main() -> int:
-    # Fail fast on the two things most likely to be misconfigured.
-    if not settings.anthropic_api_key:
-        print("ERROR: ANTHROPIC_API_KEY is not set. Copy .env.example to .env "
-              "and fill it in.")
+    engine = (settings.bird_id_engine or "local").lower()
+
+    # Fail fast on the things most likely to be misconfigured. The Anthropic key
+    # is only needed for the "claude" engine — local/ollama run without it.
+    if engine == "claude" and not settings.anthropic_api_key:
+        print("ERROR: BIRD_ID_ENGINE=claude but ANTHROPIC_API_KEY is not set. "
+              "Set the key, or switch to the free 'local'/'ollama' engine.")
         return 1
     if not (settings.arlo_username and settings.arlo_password):
         print("ERROR: Arlo credentials are not set. Edit .env (ARLO_USERNAME / "
@@ -39,7 +42,14 @@ def main() -> int:
     settings.ensure_dirs()
     init_db()
 
-    print(f"Bird ID monitor starting. Model: {settings.bird_id_model}. "
+    if engine == "claude":
+        engine_desc = f"claude ({settings.bird_id_model})"
+    elif engine == "ollama":
+        engine_desc = f"ollama ({settings.ollama_model} @ {settings.ollama_url})"
+    else:
+        engine_desc = "local (on-device classifier)"
+
+    print(f"Bird ID monitor starting. Engine: {engine_desc}. "
           f"Notify mode: {settings.notify_mode}.")
     watcher = ArloWatcher(on_clip=_on_clip)
     watcher.run()
