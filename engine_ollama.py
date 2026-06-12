@@ -14,12 +14,11 @@ import urllib.error
 import urllib.request
 
 from config import settings
-from identifier import BirdAnalysis
+from identifier import BirdAnalysis, SpeciesSighting
 
 SYSTEM_PROMPT = """\
-You are an expert ornithologist identifying birds from security-camera frames.
-The frames are from one short motion event, so the same bird may appear several
-times. Be honest about confidence: low for blurry/distant/partial birds, high
+You are an expert ornithologist identifying birds from a single security-camera
+frame. Be honest about confidence: low for blurry/distant/partial birds, high
 only for clear views. Only report actual birds — if the motion was a person,
 pet, squirrel, vehicle, leaves, or nothing identifiable, report no birds. Do not
 invent a species; if you see a bird but can't tell what it is, use
@@ -43,21 +42,45 @@ If no bird is present, set is_bird_present to false and species to []."""
 
 
 def analyze(frames: list[bytes]) -> BirdAnalysis:
-    images = [base64.standard_b64encode(f).decode("utf-8") for f in frames]
+    """Identify birds across frames.
+
+    Ollama's /api/generate takes one image per call for these vision models
+    (multiple images in one request are rejected with HTTP 400), so we send each
+    frame separately and merge — keeping the highest-confidence sighting per
+    species, the same strategy the local engine uses.
+    """
     location = (
         f"Approximate location: {settings.location_hint}. "
         if settings.location_hint
         else ""
     )
+    prompt = (
+        f"{location}Here is one frame from a motion event. "
+        "Identify any birds present and respond with the JSON object."
+    )
 
+    per_frame: list[BirdAnalysis] = []
+    last_error: Exception | None = None
+    for frame in frames:
+        try:
+            per_frame.append(_analyze_one(frame, prompt))
+        except RuntimeError as exc:
+            last_error = exc  # keep going; one bad frame shouldn't sink the event
+
+    if not per_frame:
+        # Every frame failed — surface the reason rather than a silent "no bird".
+        raise last_error or RuntimeError("Ollama returned no usable result.")
+
+    return _merge(per_frame)
+
+
+def _analyze_one(frame: bytes, prompt: str) -> BirdAnalysis:
+    image = base64.standard_b64encode(frame).decode("utf-8")
     payload = {
         "model": settings.ollama_model,
         "system": SYSTEM_PROMPT,
-        "prompt": (
-            f"{location}Here are {len(frames)} frame(s) from one motion event. "
-            "Identify any birds present and respond with the JSON object."
-        ),
-        "images": images,
+        "prompt": prompt,
+        "images": [image],
         "format": "json",      # force syntactically valid JSON
         "stream": False,
         "options": {"temperature": 0},
@@ -91,6 +114,29 @@ def analyze(frames: list[bytes]) -> BirdAnalysis:
         ) from exc
 
     return _parse(body.get("response", ""))
+
+
+def _merge(results: list[BirdAnalysis]) -> BirdAnalysis:
+    """Combine per-frame analyses: best confidence per species across frames."""
+    best: dict[str, SpeciesSighting] = {}
+    for r in results:
+        for s in r.species:
+            key = s.common_name.strip().lower()
+            if key not in best or s.confidence > best[key].confidence:
+                best[key] = s
+
+    if not best:
+        return BirdAnalysis(
+            is_bird_present=False, species=[], summary="No bird detected."
+        )
+
+    species = sorted(best.values(), key=lambda s: -s.confidence)
+    top = species[0]
+    return BirdAnalysis(
+        is_bird_present=True,
+        species=species,
+        summary=f"{top.common_name} ({top.confidence:.0%} confidence).",
+    )
 
 
 def _parse(text: str) -> BirdAnalysis:
