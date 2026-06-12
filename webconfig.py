@@ -47,6 +47,11 @@ SECTIONS: list[tuple[str, list[Field]]] = [
               "lever on CPU: 1024 is ~2x faster than 1568. Lower (768) = faster, "
               "0 = no downscaling.",
               minimum=0, maximum=2048),
+        Field("OLLAMA_NUM_THREAD", "CPU threads", "int",
+              "Set to the Ollama box's pinned core count. In an LXC, Ollama "
+              "over-detects host cores and oversubscribes — a ~50x slowdown. "
+              "0 = let Ollama auto-detect (correct on bare metal/VM).",
+              minimum=0, maximum=256),
     ]),
     ("Claude (only used when engine = claude)", [
         Field("ANTHROPIC_API_KEY", "Anthropic API key", "password",

@@ -48,6 +48,12 @@ class Settings:
     # and that cost scales with area — 1024 is ~2x faster than 1568 and still
     # easily IDs a feeder bird. Lower (768) for more speed, 0 to disable.
     ollama_image_max_edge: int = int(os.getenv("OLLAMA_IMAGE_MAX_EDGE", "1024") or "1024")
+    # Threads llama.cpp uses per request. In an LXC, Ollama reads the HOST cpu
+    # count and oversubscribes (e.g. 56 threads on a 28-core cpuset), which can
+    # slow generation ~50x from thread thrashing. Set this to the number of CPU
+    # cores the Ollama container actually has pinned. 0 = let Ollama auto-detect
+    # (correct on bare metal / a VM that sees only its own cores).
+    ollama_num_thread: int = int(os.getenv("OLLAMA_NUM_THREAD", "0") or "0")
 
     # Claude engine (only used when BIRD_ID_ENGINE=claude)
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")

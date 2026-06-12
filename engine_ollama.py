@@ -117,6 +117,11 @@ def _downscale(frame: bytes) -> bytes:
 
 def _analyze_one(frame: bytes, prompt: str) -> BirdAnalysis:
     image = base64.standard_b64encode(_downscale(frame)).decode("utf-8")
+    options = {"temperature": 0}
+    if settings.ollama_num_thread > 0:
+        # Cap threads to the Ollama box's real core count; in an LXC it otherwise
+        # oversubscribes host cores and generation slows by ~50x.
+        options["num_thread"] = settings.ollama_num_thread
     payload = {
         "model": settings.ollama_model,
         "system": SYSTEM_PROMPT,
@@ -125,7 +130,7 @@ def _analyze_one(frame: bytes, prompt: str) -> BirdAnalysis:
         "format": "json",      # force syntactically valid JSON
         "stream": False,
         "keep_alive": settings.ollama_keep_alive,  # keep model resident between events
-        "options": {"temperature": 0},
+        "options": options,
     }
 
     url = settings.ollama_url.rstrip("/") + "/api/generate"
