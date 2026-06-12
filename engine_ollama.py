@@ -72,6 +72,18 @@ def analyze(frames: list[bytes]) -> BirdAnalysis:
     try:
         with urllib.request.urlopen(request, timeout=settings.ollama_timeout) as resp:
             body = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        # Ollama explains *why* it rejected the request in the response body
+        # (e.g. {"error":"model '...' not found, try pulling it first"}).
+        try:
+            detail = exc.read().decode("utf-8", "replace").strip()
+        except Exception:
+            detail = ""
+        raise RuntimeError(
+            f"Ollama at {url} returned HTTP {exc.code}: {detail or exc.reason}. "
+            f"Check that model '{settings.ollama_model}' is pulled "
+            f"(ollama list) and that Ollama is new enough to run it."
+        ) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(
             f"Could not reach Ollama at {url}: {exc}. Is the server up and the "
