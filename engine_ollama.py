@@ -83,6 +83,7 @@ def _analyze_one(frame: bytes, prompt: str) -> BirdAnalysis:
         "images": [image],
         "format": "json",      # force syntactically valid JSON
         "stream": False,
+        "keep_alive": settings.ollama_keep_alive,  # keep model resident between events
         "options": {"temperature": 0},
     }
 
@@ -95,6 +96,15 @@ def _analyze_one(frame: bytes, prompt: str) -> BirdAnalysis:
     try:
         with urllib.request.urlopen(request, timeout=settings.ollama_timeout) as resp:
             body = json.loads(resp.read().decode("utf-8"))
+    except TimeoutError as exc:
+        # A socket timeout is TimeoutError, NOT a URLError — catch it explicitly
+        # and raise RuntimeError so the per-frame loop continues. The model stays
+        # loaded after a cold-load timeout, so a later frame often runs warm.
+        raise RuntimeError(
+            f"Ollama at {url} timed out after {settings.ollama_timeout}s "
+            f"(model '{settings.ollama_model}' may still be cold-loading). "
+            "Raise OLLAMA_TIMEOUT, lower FRAMES_PER_CLIP, or pin CPU/NUMA."
+        ) from exc
     except urllib.error.HTTPError as exc:
         # Ollama explains *why* it rejected the request in the response body
         # (e.g. {"error":"model '...' not found, try pulling it first"}).

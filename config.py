@@ -39,6 +39,10 @@ class Settings:
     ollama_url: str = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
     ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3.2-vision")
     ollama_timeout: int = int(os.getenv("OLLAMA_TIMEOUT", "180") or "180")
+    # How long Ollama keeps the model loaded in RAM between requests. Default 5m;
+    # set longer (e.g. "30m") or "-1" to keep it resident so sparse motion events
+    # don't re-pay the cold-load cost each time.
+    ollama_keep_alive: str = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
 
     # Claude engine (only used when BIRD_ID_ENGINE=claude)
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")

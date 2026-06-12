@@ -39,6 +39,9 @@ SECTIONS: list[tuple[str, list[Field]]] = [
         Field("OLLAMA_TIMEOUT", "Timeout (seconds)", "int",
               "Max wait per image. CPU inference can be slow.",
               minimum=10, maximum=1200),
+        Field("OLLAMA_KEEP_ALIVE", "Keep model loaded", "text",
+              "How long Ollama keeps the model in RAM between events "
+              "(e.g. '30m', or '-1' to keep it resident forever)."),
     ]),
     ("Claude (only used when engine = claude)", [
         Field("ANTHROPIC_API_KEY", "Anthropic API key", "password",
