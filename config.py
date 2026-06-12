@@ -43,6 +43,11 @@ class Settings:
     # set longer (e.g. "30m") or "-1" to keep it resident so sparse motion events
     # don't re-pay the cold-load cost each time.
     ollama_keep_alive: str = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
+    # Downscale each frame to this longest-edge (px) before sending to Ollama.
+    # CPU vision models spend most of their time turning pixels into image tokens,
+    # and that cost scales with area — 1024 is ~2x faster than 1568 and still
+    # easily IDs a feeder bird. Lower (768) for more speed, 0 to disable.
+    ollama_image_max_edge: int = int(os.getenv("OLLAMA_IMAGE_MAX_EDGE", "1024") or "1024")
 
     # Claude engine (only used when BIRD_ID_ENGINE=claude)
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")

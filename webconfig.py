@@ -42,6 +42,11 @@ SECTIONS: list[tuple[str, list[Field]]] = [
         Field("OLLAMA_KEEP_ALIVE", "Keep model loaded", "text",
               "How long Ollama keeps the model in RAM between events "
               "(e.g. '30m', or '-1' to keep it resident forever)."),
+        Field("OLLAMA_IMAGE_MAX_EDGE", "Image size (px)", "int",
+              "Downscale each frame's longest edge before sending. Biggest speed "
+              "lever on CPU: 1024 is ~2x faster than 1568. Lower (768) = faster, "
+              "0 = no downscaling.",
+              minimum=0, maximum=2048),
     ]),
     ("Claude (only used when engine = claude)", [
         Field("ANTHROPIC_API_KEY", "Anthropic API key", "password",

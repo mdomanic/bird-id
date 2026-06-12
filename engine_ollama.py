@@ -12,6 +12,7 @@ import base64
 import json
 import urllib.error
 import urllib.request
+from io import BytesIO
 
 from config import settings
 from identifier import BirdAnalysis, SpeciesSighting
@@ -85,8 +86,37 @@ def analyze(frames: list[bytes]) -> BirdAnalysis:
     return _merge(per_frame)
 
 
+def _downscale(frame: bytes) -> bytes:
+    """Shrink a frame's longest edge to OLLAMA_IMAGE_MAX_EDGE before sending.
+
+    A CPU vision model spends most of its time encoding pixels into image tokens,
+    and that cost scales with area, so this is the biggest single speed lever.
+    Returns the original bytes unchanged if downscaling is disabled, the image is
+    already small enough, or Pillow can't read it.
+    """
+    max_edge = settings.ollama_image_max_edge
+    if max_edge <= 0:
+        return frame
+    try:
+        from PIL import Image
+        img = Image.open(BytesIO(frame))
+        img.load()
+    except Exception:
+        return frame  # never let a decode hiccup break identification
+    w, h = img.size
+    if max(w, h) <= max_edge:
+        return frame
+    scale = max_edge / max(w, h)
+    img = img.convert("RGB").resize(
+        (max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS
+    )
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=85)
+    return buf.getvalue()
+
+
 def _analyze_one(frame: bytes, prompt: str) -> BirdAnalysis:
-    image = base64.standard_b64encode(frame).decode("utf-8")
+    image = base64.standard_b64encode(_downscale(frame)).decode("utf-8")
     payload = {
         "model": settings.ollama_model,
         "system": SYSTEM_PROMPT,
