@@ -70,8 +70,10 @@ SECTIONS: list[tuple[str, list[Field]]] = [
     ]),
     ("Detection", [
         Field("FRAMES_PER_CLIP", "Frames per clip", "int",
-              "How many frames per motion event to send to Claude.",
-              minimum=1, maximum=12),
+              "Frames sampled per motion event. More = better coverage of a bird "
+              "that's only sharp in one frame, but the ollama engine analyzes them "
+              "one at a time, so latency scales with this.",
+              minimum=1, maximum=24),
         Field("MIN_CONFIDENCE", "Minimum confidence", "float",
               "0.0-1.0. Sightings below this are ignored.",
               minimum=0.0, maximum=1.0),

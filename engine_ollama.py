@@ -59,13 +59,24 @@ def analyze(frames: list[bytes]) -> BirdAnalysis:
         "Identify any birds present and respond with the JSON object."
     )
 
+    total = len(frames)
     per_frame: list[BirdAnalysis] = []
     last_error: Exception | None = None
-    for frame in frames:
+    for i, frame in enumerate(frames, 1):
         try:
-            per_frame.append(_analyze_one(frame, prompt))
+            result = _analyze_one(frame, prompt)
         except RuntimeError as exc:
+            print(f"[ollama] frame {i}/{total} failed: {exc}")
             last_error = exc  # keep going; one bad frame shouldn't sink the event
+            continue
+        if result.species:
+            top = max(result.species, key=lambda s: s.confidence)
+            others = f" (+{len(result.species) - 1} more)" if len(result.species) > 1 else ""
+            print(f"[ollama] frame {i}/{total}: {top.common_name} "
+                  f"{top.confidence:.0%}{others}")
+        else:
+            print(f"[ollama] frame {i}/{total}: no bird — {result.summary[:80]}")
+        per_frame.append(result)
 
     if not per_frame:
         # Every frame failed — surface the reason rather than a silent "no bird".
@@ -149,14 +160,68 @@ def _merge(results: list[BirdAnalysis]) -> BirdAnalysis:
     )
 
 
-def _parse(text: str) -> BirdAnalysis:
+def _to_float(value, default: float = 0.0) -> float:
     try:
-        return BirdAnalysis.model_validate_json(text)
-    except Exception:
-        # Model didn't return clean schema-matching JSON — fail safe.
-        snippet = text.strip()[:160]
+        f = float(value)
+    except (TypeError, ValueError):
+        return default
+    # Some models report confidence as a 0-100 percentage; normalize to 0-1.
+    if f > 1.0:
+        f = f / 100.0
+    return max(0.0, min(1.0, f))
+
+
+def _to_int(value, default: int = 1) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _parse(text: str) -> BirdAnalysis:
+    """Build a BirdAnalysis from the model's JSON, tolerating schema drift.
+
+    A small VLM won't always honor the exact schema — it may use 'name' instead
+    of 'common_name', omit 'count'/'field_marks', give confidence as a string or
+    a 0-100 percentage, or wrap the bird list under a different key. Rather than
+    reject the whole response (and silently report "no bird"), we coerce what we
+    can and log anything we can't parse at all.
+    """
+    try:
+        data = json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        print(f"[ollama] non-JSON response: {text.strip()[:200]!r}")
         return BirdAnalysis(
-            is_bird_present=False,
-            species=[],
-            summary=snippet or "Ollama returned no parseable result.",
+            is_bird_present=False, species=[],
+            summary="Ollama returned no parseable result.",
         )
+
+    if not isinstance(data, dict):
+        return BirdAnalysis(is_bird_present=False, species=[], summary="")
+
+    raw = data.get("species")
+    if not isinstance(raw, list):
+        raw = data.get("birds") if isinstance(data.get("birds"), list) else []
+
+    species: list[SpeciesSighting] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("common_name") or item.get("name") or "").strip()
+        if not name:
+            continue
+        species.append(SpeciesSighting(
+            common_name=name,
+            scientific_name=(item.get("scientific_name") or None),
+            confidence=_to_float(item.get("confidence")),
+            count=_to_int(item.get("count")),
+            field_marks=str(item.get("field_marks") or ""),
+        ))
+
+    summary = str(data.get("summary") or "").strip()
+    is_present = bool(data.get("is_bird_present")) or bool(species)
+    return BirdAnalysis(
+        is_bird_present=is_present,
+        species=species,
+        summary=summary or ("Bird detected." if species else "No bird detected."),
+    )
