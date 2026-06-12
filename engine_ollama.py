@@ -173,12 +173,23 @@ def _analyze_one(frame: bytes, prompt: str) -> BirdAnalysis:
 
 
 def _merge(results: list[BirdAnalysis]) -> BirdAnalysis:
-    """Combine per-frame analyses: best confidence per species across frames."""
+    """Combine per-frame analyses with consensus voting.
+
+    A VLM can name a different plausible species on each frame of one clip, so a
+    naive "keep every species seen" merge turns one outlier frame into a false
+    sighting. Instead we count how many frames each species appears in and, when
+    multiple frames were analyzed, keep only those with real support: species
+    seen in >=2 frames, or — if every frame disagreed — just the single most
+    confident guess. Each kept species keeps its best confidence across frames.
+    """
     best: dict[str, SpeciesSighting] = {}
+    votes: dict[str, int] = {}
     for r in results:
+        for key in {s.common_name.strip().lower() for s in r.species if s.common_name.strip()}:
+            votes[key] = votes.get(key, 0) + 1
         for s in r.species:
             key = s.common_name.strip().lower()
-            if key not in best or s.confidence > best[key].confidence:
+            if key and (key not in best or s.confidence > best[key].confidence):
                 best[key] = s
 
     if not best:
@@ -186,7 +197,24 @@ def _merge(results: list[BirdAnalysis]) -> BirdAnalysis:
             is_bird_present=False, species=[], summary="No bird detected."
         )
 
-    species = sorted(best.values(), key=lambda s: -s.confidence)
+    n = len(results)
+    if n >= 2:
+        max_votes = max(votes.values())
+        if max_votes >= 2:
+            keep = {k for k, v in votes.items() if v >= 2}
+        else:
+            # Every frame disagreed — trust only the single most confident call.
+            keep = {max(best, key=lambda k: best[k].confidence)}
+    else:
+        keep = set(best)  # single frame: nothing to cross-check against
+
+    species = sorted(
+        (best[k] for k in keep), key=lambda s: (-votes[s.common_name.strip().lower()], -s.confidence)
+    )
+    if len(keep) < len(best):
+        dropped = ", ".join(sorted(set(best) - keep))
+        print(f"[ollama] consensus kept {len(keep)}/{len(best)} species across "
+              f"{n} frames; dropped outliers: {dropped}")
     top = species[0]
     return BirdAnalysis(
         is_bird_present=True,
