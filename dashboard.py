@@ -21,7 +21,9 @@ from flask import (
 
 from config import CAPTURES_DIR, settings
 from envfile import read_env, update_env
-from storage import recent_sightings, species_tally
+from storage import (
+    confirmed_species, recent_sightings, set_feedback, species_tally,
+)
 from webconfig import SECTIONS, collect_updates
 
 app = Flask(__name__)
@@ -61,12 +63,43 @@ def index():
     sightings = recent_sightings(limit=100)
     for s in sightings:
         s["image_name"] = Path(s["image_path"]).name if s.get("image_path") else None
+    tally = species_tally()
+    # Names offered as autocomplete when correcting a sighting.
+    species_names = sorted(
+        {s["common_name"] for s in tally} | set(confirmed_species())
+    )
     return render_template(
         "dashboard.html",
         sightings=sightings,
-        tally=species_tally(),
+        tally=tally,
+        species_names=species_names,
+        confirmed=confirmed_species(),
         location=settings.location_hint,
     )
+
+
+@app.route("/feedback/<int:sighting_id>", methods=["POST"])
+@require_auth
+def feedback(sighting_id: int):
+    """Record a thumbs-up / correction on a sighting. Confirmed species then
+    prime future identifications (see engine_ollama)."""
+    verdict = (request.form.get("verdict") or "").strip().lower()
+    if verdict not in ("correct", "wrong"):
+        abort(400)
+    corrected = request.form.get("corrected_common_name", "")
+    if verdict == "wrong" and not corrected.strip():
+        flash("Enter the correct species when marking a sighting wrong.", "error")
+        return redirect(url_for("index") + "#s" + str(sighting_id))
+
+    if set_feedback(sighting_id, verdict, corrected_common=corrected):
+        if verdict == "correct":
+            flash("Thanks — confirmed. This species now helps guide future IDs.", "ok")
+        else:
+            flash(f"Thanks — recorded as {corrected.strip()}. It'll now help guide "
+                  "future IDs.", "ok")
+    else:
+        flash("Sighting not found.", "error")
+    return redirect(url_for("index") + "#s" + str(sighting_id))
 
 
 @app.route("/api/sightings")

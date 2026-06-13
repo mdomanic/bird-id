@@ -55,8 +55,25 @@ def analyze(frames: list[bytes]) -> BirdAnalysis:
         if settings.location_hint
         else ""
     )
+    # Prime the model with species the user has confirmed at this camera. A VLM
+    # confabulates far less when told the local cast, so this is how feedback
+    # improves future IDs.
+    try:
+        from storage import confirmed_species
+        confirmed = confirmed_species()
+    except Exception:
+        confirmed = []
+    if confirmed:
+        local = (
+            "Birds confirmed at this exact location before: "
+            + ", ".join(confirmed[:25])
+            + ". These are much more likely than visually similar species — prefer "
+            "one of them unless the bird clearly does not match any. "
+        )
+    else:
+        local = ""
     prompt = (
-        f"{location}Here is one frame from a motion event. "
+        f"{location}{local}Here is one frame from a motion event. "
         "Identify any birds present and respond with the JSON object."
     )
 

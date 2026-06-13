@@ -48,6 +48,27 @@
     .empty { color: #8b94a6; padding: 40px 0; text-align: center; }
     header a { color: #7fd1ae; text-decoration: none; font-size: 14px; }
     footer { text-align:center; color:#6b7488; font-size:12px; padding: 24px; }
+    /* Feedback */
+    .feedback { margin-top: 10px; border-top: 1px solid #232a36; padding-top: 10px; }
+    .fb-state { font-size: 12px; margin-bottom: 6px; }
+    .fb-ok { color: #7fd1ae; }
+    .fb-fix { color: #d9b873; }
+    .fb-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .fb-btn {
+      cursor: pointer; border: 1px solid #2a3344; background: #1b2230;
+      color: #e7e9ee; border-radius: 6px; padding: 5px 9px; font-size: 12px;
+    }
+    .fb-btn.ok:hover { background: #1f3a2e; border-color: #2f5a45; }
+    .fb-btn.no:hover { background: #3a2330; border-color: #5a2f43; }
+    .fb-input {
+      flex: 1; min-width: 110px; background: #0f1115; color: #e7e9ee;
+      border: 1px solid #2a3344; border-radius: 6px; padding: 5px 8px; font-size: 12px;
+    }
+    .flashes { margin-bottom: 16px; }
+    .flash { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 8px; }
+    .flash.ok { background: #14301f; color: #7fd1ae; border: 1px solid #275c40; }
+    .flash.error { background: #3a1f24; color: #e3a3ad; border: 1px solid #6e3540; }
+    .primed { color:#7fd1ae; }
   </style>
 </head>
 <body>
@@ -62,6 +83,23 @@
     <a href="/settings">⚙️ Settings</a>
   </header>
   <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="flashes">
+        {% for category, msg in messages %}
+        <div class="flash {{ category }}">{{ msg }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+
+    {% if confirmed %}
+    <p class="primed" style="font-size:13px; margin:0 0 4px;">
+      🎯 Priming the model with {{ confirmed|length }} confirmed species:
+      {{ confirmed[:25]|join(', ') }}.
+    </p>
+    {% endif %}
+
     <h2>Species seen</h2>
     {% if tally %}
     <div class="tally">
@@ -83,7 +121,7 @@
     {% if sightings %}
     <div class="grid">
       {% for s in sightings %}
-      <div class="card">
+      <div class="card" id="s{{ s.id }}">
         {% if s.image_name %}
           <img src="/image/{{ s.image_name }}" alt="{{ s.common_name }}" loading="lazy">
         {% endif %}
@@ -99,14 +137,35 @@
             &nbsp;· {{ s.source }}
           </div>
           {% if s.field_marks %}<div class="marks">{{ s.field_marks }}</div>{% endif %}
+
+          <div class="feedback">
+            {% if s.verdict == 'correct' %}
+              <div class="fb-state fb-ok">✓ Confirmed correct</div>
+            {% elif s.verdict == 'wrong' %}
+              <div class="fb-state fb-fix">✗ Corrected to
+                <b>{{ s.corrected_common_name or 'unknown' }}</b></div>
+            {% endif %}
+            <form class="fb-form" method="post" action="/feedback/{{ s.id }}">
+              <button class="fb-btn ok" name="verdict" value="correct"
+                      title="This ID is correct">✓ Correct</button>
+              <input class="fb-input" type="text" name="corrected_common_name"
+                     list="species-list" placeholder="actual species…"
+                     autocomplete="off">
+              <button class="fb-btn no" name="verdict" value="wrong"
+                      title="Wrong — submit the species typed at left">✗ Fix</button>
+            </form>
+          </div>
         </div>
       </div>
       {% endfor %}
     </div>
+    <datalist id="species-list">
+      {% for n in species_names %}<option value="{{ n }}"></option>{% endfor %}
+    </datalist>
     {% else %}
     <p class="empty">No sightings recorded yet.</p>
     {% endif %}
   </main>
-  <footer>Bird ID · powered by Claude vision</footer>
+  <footer>Bird ID · {{ confirmed|length }} confirmed species priming the model</footer>
 </body>
 </html>

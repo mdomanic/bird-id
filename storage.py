@@ -40,9 +40,23 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
+# Columns added after the original schema shipped; created on the fly so existing
+# databases upgrade in place without a migration step.
+_EXTRA_COLUMNS = {
+    "verdict": "TEXT",                    # NULL | 'correct' | 'wrong'
+    "corrected_common_name": "TEXT",
+    "corrected_scientific_name": "TEXT",
+    "feedback_at": "TEXT",
+}
+
+
 def init_db() -> None:
     with _connect() as conn:
         conn.executescript(_SCHEMA)
+        existing = {r["name"] for r in conn.execute("PRAGMA table_info(sightings)")}
+        for col, col_type in _EXTRA_COLUMNS.items():
+            if col not in existing:
+                conn.execute(f"ALTER TABLE sightings ADD COLUMN {col} {col_type}")
 
 
 def save_frame(jpeg_bytes: bytes, event_id: str) -> Path:
@@ -86,6 +100,53 @@ def record_sighting(
             )
             saved.append(sp.common_name)
     return saved
+
+
+def set_feedback(
+    sighting_id: int,
+    verdict: str,
+    corrected_common: str | None = None,
+    corrected_scientific: str | None = None,
+) -> bool:
+    """Record the user's verdict on a sighting. Returns True if a row was updated.
+
+    verdict is 'correct' or 'wrong'; for 'wrong', corrected_common is the species
+    the user says it actually is.
+    """
+    init_db()
+    now = datetime.now().isoformat(timespec="seconds")
+    cc = (corrected_common or "").strip() or None
+    cs = (corrected_scientific or "").strip() or None
+    with _connect() as conn:
+        cur = conn.execute(
+            """UPDATE sightings
+               SET verdict=?, corrected_common_name=?, corrected_scientific_name=?,
+                   feedback_at=?
+               WHERE id=?""",
+            (verdict, cc, cs, now, sighting_id),
+        )
+    return cur.rowcount > 0
+
+
+def confirmed_species() -> list[str]:
+    """Species the user has vouched for — confirmed-correct names plus the
+    corrections they supplied. Used to prime the model toward birds that actually
+    appear at this location. Most-recently-confirmed first."""
+    init_db()
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT verdict, common_name, corrected_common_name
+               FROM sightings
+               WHERE verdict IS NOT NULL
+               ORDER BY feedback_at DESC, id DESC"""
+        ).fetchall()
+    names: dict[str, None] = {}  # ordered de-dupe
+    for r in rows:
+        if r["verdict"] == "correct" and r["common_name"]:
+            names.setdefault(r["common_name"].strip(), None)
+        elif r["verdict"] == "wrong" and r["corrected_common_name"]:
+            names.setdefault(r["corrected_common_name"].strip(), None)
+    return [n for n in names if n]
 
 
 def known_species() -> set[str]:
